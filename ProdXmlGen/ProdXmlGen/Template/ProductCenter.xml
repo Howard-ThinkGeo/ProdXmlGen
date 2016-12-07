@@ -1,0 +1,30 @@
+﻿<product>
+  <part type="MapSuiteProductCenter.ProductProjectTemplatesPart">
+    <name>Project Templates</name>
+    <subparts>
+      <subpart>
+        <IsPagging>0</IsPagging>
+        <items>
+        </items>
+      </subpart>
+    </subparts>
+  </part>
+  <part type="MapSuiteProductCenter.ProductCodeSamplePart">
+    <name>Code Samples</name>
+    <subparts>
+      <subpart>
+        <IsPagging>1</IsPagging>
+        <pageSize>10</pageSize>
+        <categoryPrefix>Show:</categoryPrefix>
+        <isSearchSupport>1</isSearchSupport>
+        <searchPrefix>Find a Sample:</searchPrefix>
+        <categories>
+          <category id="0">All Samples</category>
+          <category id="1">Learning Samples</category>
+        </categories>
+        <items>
+        </items>
+      </subpart>
+    </subparts>
+  </part>
+</product>
