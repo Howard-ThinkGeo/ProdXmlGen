@@ -1,13 +1,13 @@
 ﻿<item>
-  <title>{Title}</title>
+  <title></title>
   <hyperlinks>
     <link>
-      <herf>{ZipUrl}</herf>
+      <herf></herf>
       <text>Launch Template</text>
     </link>
   </hyperlinks>
   <awasomePicture>
-    <orginal>{ScreenShotUrl}</orginal>
+    <orginal></orginal>
   </awasomePicture>
-  <description>{Description}</description>
+  <description></description>
 </item>

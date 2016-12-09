@@ -4,117 +4,188 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace ProdXmlGen
 {
     class Program
     {
         public static List<string> AllPlatforms = new List<string> { "Android", "iOS", "Mvc", "WebApi", "WebForms", "WinForms", "Wpf" };
+
         static void Main(string[] args)
         {
-            if (args.Length == 2)
+            List<string> tempPlatforms = new List<string>();
+            string outputFolder = string.Empty;
+
+            switch (args.Length)
             {
-                string[] args1 = args[0].Split(',');
-                string outputFolder = args[1];
-
-                List<string> tempPlatforms = new List<string>();
-                if (args1.Length == 1 && args1[0].Equals("all"))
-                {
+                case 0:
                     tempPlatforms = AllPlatforms;
-                }
-                else
-                {
-                    foreach (string platform in args1)
-                        tempPlatforms.Add(platform);
-                }
+                    outputFolder = "output";
+                    break;
+                case 1:
+                    if (GetPlatforms(args[0]) != null)
+                    {
+                        tempPlatforms = GetPlatforms(args[0]).ToList();
+                        break;
+                    }
+                    else if (!string.IsNullOrEmpty(GetOutputPath(args[0])))
+                    {
+                        outputFolder = GetOutputPath(args[0]);
+                        break;
+                    }
+                    else
+                    {
+                        ShowHelp();
+                        return;
+                    }
+                case 2:
+                    if (GetPlatforms(args[0]) != null && !string.IsNullOrEmpty(GetOutputPath(args[1])))
+                    {
+                        tempPlatforms = GetPlatforms(args[0]).ToList();
+                        outputFolder = GetOutputPath(args[1]);
+                        break;
+                    }
+                    else if (GetPlatforms(args[1]) != null && !string.IsNullOrEmpty(GetOutputPath(args[0])))
+                    {
+                        tempPlatforms = GetPlatforms(args[1]).ToList();
+                        outputFolder = GetOutputPath(args[0]);
+                        break;
+                    }
+                    ShowHelp();
+                    return;
+                default:
+                    ShowHelp();
+                    return;
+            }
 
-                GetReadMe(tempPlatforms);
-                Console.WriteLine("Download readme Done!");
-                GenerateXml(tempPlatforms, outputFolder);
-                Console.WriteLine("Complete !");
-                Console.ReadLine();
+            GenerateXml(tempPlatforms, outputFolder);
+            Console.WriteLine("Complete !");
+            Console.ReadLine();
+        }
+
+        public static IReadOnlyList<Repository> GetAllRepositories(string userName, string passWorld)
+        {
+            try
+            {
+                GitHubClient client = new GitHubClient(new ProductHeaderValue("Test"));
+                client.Credentials = new Credentials(userName, passWorld);
+
+                Task<IReadOnlyList<Repository>> repositories = client.Repository.GetAllForOrg("ThinkGeo");
+                repositories.Wait();
+                return repositories.Result;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                throw e;
             }
         }
 
-        private static void GetReadMe(List<string> platforms)
+        private static string[] GetPlatforms(string arg)
         {
-            var task = GitHubCommand.GetAllRepositories();
-            task.Wait();
-
+            if (string.IsNullOrEmpty(Regex.Match(arg, "^-p=").Value)) return null;
+            string[] platforms = arg.Remove(0, 3).Split(',').Distinct().ToArray();
             foreach (string platform in platforms)
             {
-                string tempFolder = Path.Combine("ReadMe", platform);
-                if (Directory.Exists(tempFolder))
-                    Directory.Delete(tempFolder, true);
-                Directory.CreateDirectory(tempFolder);
-
-                foreach (Repository repo in task.Result)
+                if (!AllPlatforms.Contains(platform))
                 {
-                    string sshUrl = repo.SshUrl;
-                    string gitName = sshUrl.Split('/').Last();
-                    string repoName = gitName.Remove(gitName.Length - 4, 4);
-                    if (sshUrl.Contains(string.Format("-For{0}", platform)))
-                    {
-                        string url = string.Format("https://raw.githubusercontent.com/ThinkGeo/{0}/master/README.md", repoName);
-                        try
-                        {
-                            WebClient client = new WebClient();
-                            client.DownloadFile(new Uri(url), Path.Combine(tempFolder, repoName + ".md"));
-                        }
-                        catch (Exception err)
-                        {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine(err.Message);
-                            Console.ResetColor();
-                        }
-                        Console.WriteLine($"Downloading {repoName}");
-                    }
+                    Console.WriteLine("platforms Only exist Android,iOS,Mvc,WebApi,WebForms,WinForms,Wpf");
+                    return null;
                 }
             }
+            return platforms;
+        }
+
+        private static string GetOutputPath(string arg)
+        {
+            if (string.IsNullOrEmpty(Regex.Match(arg, "^-o=").Value)) return null;
+            string output = arg.Remove(0, 3);
+            if (string.IsNullOrEmpty(Regex.Match(output, @"^[^ \t]+[ \t]+(.*)$").Value))
+            {
+                Console.WriteLine("The pattern of path is erorr");
+                return null;
+            }
+            return output;
+        }
+
+        private static void ShowHelp()
+        {
+            Console.WriteLine(@"usage: [-h] [-p=value] [-o=value]
+    -h             Show help information
+    -p= value       platforms: Android,iOS,Mvc,WebApi,WebForms,WinForms,Wpf
+
+                   Pattern: XX, XX,...
+                   Defailt value: all
+    -o= value       Output path.");
         }
 
         private static void GenerateXml(List<string> platforms, string outputFolder)
         {
-            if (Directory.Exists(outputFolder))
-                Directory.Delete(outputFolder, true);
-            Directory.CreateDirectory(outputFolder);
+            if (!Directory.Exists(outputFolder))
+                Directory.CreateDirectory(outputFolder);
 
+            var repos = GetAllRepositories("mikeyu@thinkgeo.com", "github12348765");
+            int index = 0;
             foreach (string platform in platforms)
             {
-                Generator.GenerateXml(platform, Path.Combine("ReadMe", platform), outputFolder);
-            }
-        }
+                XDocument xDoc = XDocument.Load(@"Template\ProductCenter.xml");
 
-        private static void Clone(List<string> platforms)
-        {
-            var task = GitHubCommand.GetAllRepositories();
-            task.Wait();
-            if (Directory.Exists("Repos"))
-                Directory.Delete("Repos", true);
-            Directory.CreateDirectory("Repos");
-
-            foreach (string platform in platforms)
-            {
-                CloneAllRepositoriesOfOnePlatform(platform, Path.Combine("Repos", platform), task.Result);
-            }
-        }
-
-        public static void CloneAllRepositoriesOfOnePlatform(string platform, string outputDirectory, IReadOnlyList<Repository> repos)
-        {
-            if (Directory.Exists(outputDirectory))
-                Directory.Delete(outputDirectory, true);
-            Directory.CreateDirectory(outputDirectory);
-            foreach (Repository repo in repos)
-            {
-                string sshUrl = repo.SshUrl;
-                string gitName = sshUrl.Split('/').Last();
-                string repoName = gitName.Remove(gitName.Length - 4, 4);
-                if (sshUrl.Contains(string.Format("-For{0}", platform)))
+                foreach (Repository repo in repos)
                 {
-                    string result = GitHubCommand.Clone(sshUrl, outputDirectory, repoName);
-                    Console.WriteLine(result);
-                    break;
+                    string sshUrl = repo.SshUrl;
+                    if (!sshUrl.Contains(string.Format("-For{0}", platform))) continue;
+
+                    string readMeContent = string.Empty;
+                    string gitName = sshUrl.Split('/').Last();
+                    string repoName = gitName.Remove(gitName.Length - 4, 4);
+
+                    string url = string.Format("https://raw.githubusercontent.com/ThinkGeo/{0}/master/README.md", repoName);
+                    try
+                    {
+                        WebRequest request = HttpWebRequest.Create(url);
+                        WebResponse response = request.GetResponse();
+                        StreamReader reader = new StreamReader(response.GetResponseStream());
+                        readMeContent = reader.ReadToEnd();
+
+                        XDocument itemDoc = XDocument.Load(@"Template\item.xml");
+                        XElement titleElement = itemDoc.Root.Descendants("title").First();
+                        titleElement.Value = Regex.Match(readMeContent, "^# [a-zA-z\\s]*[a-zA-z\\n]*").Value.Replace("#", "").Trim();
+                        XElement zipElement = itemDoc.Root.Descendants("hyperlinks").Descendants("link").Descendants("herf").First();
+                        zipElement.Value = string.Format(@"https://github.com/ThinkGeo/{0}/archive/master.zip", repoName).Trim();
+                        XElement awasomePictureElement = itemDoc.Root.Descendants("awasomePicture").Descendants("orginal").First();
+                        awasomePictureElement.Value = $"https://raw.githubusercontent.com/ThinkGeo/{repoName}/master/ScreenShot.png";
+                        XElement descriptionElement = itemDoc.Root.Descendants("description").First();
+                        descriptionElement.Value = Regex.Match(readMeContent, @"### Description[\s*a-zA-z\S*\n]*!\[").Value.Replace("### Description", "").Replace("![", "").Trim();
+
+                        if (titleElement.Value.Contains("Sample Template for "))
+                        {
+                            XElement projectTemplatesElement = xDoc.Root.Descendants("part").Where(e => (e.Attribute("type").Value.Equals("MapSuiteProductCenter.ProductProjectTemplatesPart"))).Descendants("subparts").Descendants("subpart").Descendants("items").First();
+                            projectTemplatesElement.Add(itemDoc.Root);
+                        }
+                        else
+                        {
+                            XElement sourceCodeLinkeElement = new XElement("link");
+                            sourceCodeLinkeElement.Add(new XElement("herf", string.Format(@"https://github.com/ThinkGeo/{0}", repoName).Trim()));
+                            sourceCodeLinkeElement.Add(new XElement("text", "View Source Code"));
+                            itemDoc.Root.Descendants("hyperlinks").First().Add(sourceCodeLinkeElement);
+                            XElement codeSampleElement = xDoc.Root.Descendants("part").Where(e => (e.Attribute("type").Value.Equals("MapSuiteProductCenter.ProductCodeSamplePart"))).Descendants("subparts").Descendants("subpart").Descendants("items").First();
+                            codeSampleElement.Add(itemDoc.Root);
+                        }
+
+                        index++;
+                        Console.WriteLine($"Done {index}/{repos.Count}: {repoName}");
+                    }
+                    catch (Exception err)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"{err.Message} : {url}");
+                        Console.ResetColor();
+                    }
                 }
+                xDoc.Save(Path.Combine(outputFolder, $"ProductCenter-{platform}.xml"));
             }
         }
     }
