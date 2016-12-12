@@ -59,7 +59,7 @@ namespace ProdXmlGen
                 outputFolder = arguments["o"];
             }
 
-            GenerateXml(platforms.Split(',').ToList(), outputFolder);
+            GenerateXml(platforms.Split(','), outputFolder);
             Console.WriteLine("Complete !");
             Console.ReadLine();
         }
@@ -82,7 +82,7 @@ namespace ProdXmlGen
             }
         }
 
-        private static void GenerateXml(List<string> platforms, string outputFolder)
+        private static void GenerateXml(string[] platforms, string outputFolder)
         {
             if (!Directory.Exists(outputFolder))
                 Directory.CreateDirectory(outputFolder);
