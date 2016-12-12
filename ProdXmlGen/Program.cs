@@ -12,56 +12,54 @@ namespace ProdXmlGen
 {
     class Program
     {
-        public static List<string> AllPlatforms = new List<string> { "Android", "iOS", "Mvc", "WebApi", "WebForms", "WinForms", "Wpf" };
+        public static Dictionary<string, string> arguments = new Dictionary<string, string>();
 
         static void Main(string[] args)
         {
-            List<string> tempPlatforms = new List<string>();
-            string outputFolder = string.Empty;
+            #region test case
+            //exe -h
+            //exe
+            //exe -p=Mvc,Wpf
+            //exe -o=output2
+            //exe -p=Mvc,Wpf -o=output2
+            #endregion
 
-            switch (args.Length)
+            arguments.Add("h", null);
+            arguments.Add("p", "Android,iOS,Mvc,WebApi,WebForms,WinForms,Wpf");
+            arguments.Add("o", "output");
+
+            foreach (string s in args)
             {
-                case 0:
-                    tempPlatforms = AllPlatforms;
-                    outputFolder = "output";
+                if (s.Trim().Equals("-h"))
+                {
+                    arguments["h"] = "Not null";
                     break;
-                case 1:
-                    if (GetPlatforms(args[0]) != null)
-                    {
-                        tempPlatforms = GetPlatforms(args[0]).ToList();
-                        break;
-                    }
-                    else if (!string.IsNullOrEmpty(GetOutputPath(args[0])))
-                    {
-                        outputFolder = GetOutputPath(args[0]);
-                        break;
-                    }
-                    else
-                    {
-                        ShowHelp();
-                        return;
-                    }
-                case 2:
-                    if (GetPlatforms(args[0]) != null && !string.IsNullOrEmpty(GetOutputPath(args[1])))
-                    {
-                        tempPlatforms = GetPlatforms(args[0]).ToList();
-                        outputFolder = GetOutputPath(args[1]);
-                        break;
-                    }
-                    else if (GetPlatforms(args[1]) != null && !string.IsNullOrEmpty(GetOutputPath(args[0])))
-                    {
-                        tempPlatforms = GetPlatforms(args[1]).ToList();
-                        outputFolder = GetOutputPath(args[0]);
-                        break;
-                    }
-                    ShowHelp();
-                    return;
-                default:
-                    ShowHelp();
-                    return;
+                }
+                arguments[s.Trim().Split('=')[0][1].ToString()] = s.Trim().Split('=')[1];
             }
 
-            GenerateXml(tempPlatforms, outputFolder);
+            string platforms = string.Empty;
+            string outputFolder = string.Empty;
+
+            if (arguments["h"] != null)
+            {
+                Console.WriteLine(@"Usage: exePath [-options] [value]");
+                Console.WriteLine("where options include:");
+                Console.WriteLine(
+                    string.Format("{0,-10} {1}", "-h", "print this help message")
+                    + Environment.NewLine +
+                    string.Format("{0,-10} {1}", "-p", "set platforms which are comma separated")
+                    + Environment.NewLine +
+                    string.Format("{0,-10} {1}", "-o", "set output folder")
+                    );
+            }
+            else
+            {
+                platforms = arguments["p"];
+                outputFolder = arguments["o"];
+            }
+
+            GenerateXml(platforms.Split(',').ToList(), outputFolder);
             Console.WriteLine("Complete !");
             Console.ReadLine();
         }
@@ -84,44 +82,6 @@ namespace ProdXmlGen
             }
         }
 
-        private static string[] GetPlatforms(string arg)
-        {
-            if (string.IsNullOrEmpty(Regex.Match(arg, "^-p=").Value)) return null;
-            string[] platforms = arg.Remove(0, 3).Split(',').Distinct().ToArray();
-            foreach (string platform in platforms)
-            {
-                if (!AllPlatforms.Contains(platform))
-                {
-                    Console.WriteLine("platforms Only exist Android,iOS,Mvc,WebApi,WebForms,WinForms,Wpf");
-                    return null;
-                }
-            }
-            return platforms;
-        }
-
-        private static string GetOutputPath(string arg)
-        {
-            if (string.IsNullOrEmpty(Regex.Match(arg, "^-o=").Value)) return null;
-            string output = arg.Remove(0, 3);
-            if (string.IsNullOrEmpty(Regex.Match(output, @"^[^ \t]+[ \t]+(.*)$").Value))
-            {
-                Console.WriteLine("The pattern of path is erorr");
-                return null;
-            }
-            return output;
-        }
-
-        private static void ShowHelp()
-        {
-            Console.WriteLine(@"usage: [-h] [-p=value] [-o=value]
-    -h             Show help information
-    -p= value       platforms: Android,iOS,Mvc,WebApi,WebForms,WinForms,Wpf
-
-                   Pattern: XX, XX,...
-                   Defailt value: all
-    -o= value       Output path.");
-        }
-
         private static void GenerateXml(List<string> platforms, string outputFolder)
         {
             if (!Directory.Exists(outputFolder))
@@ -136,7 +96,8 @@ namespace ProdXmlGen
                 foreach (Repository repo in repos)
                 {
                     string sshUrl = repo.SshUrl;
-                    if (!sshUrl.Contains(string.Format("-For{0}", platform))) continue;
+                    if (!sshUrl.Contains(string.Format("-For{0}", platform)))
+                        continue;
 
                     string readMeContent = string.Empty;
                     string gitName = sshUrl.Split('/').Last();
